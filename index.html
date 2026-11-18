@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Echo Report Generator</title>
+<link href="assets/bootstrap.min.css" rel="stylesheet"/>
+<style>body{font-size:.9rem}textarea{font-family:"Courier New",monospace}pre{white-space:pre-wrap;overflow-wrap:anywhere}details{margin:1rem 0}summary{cursor:pointer;font-weight:600}</style>
+</head>
+<body>
+<div class="container my-4">
+  <h2 class="mb-3">Echocardiography Report Generator</h2>
+  <p class="small text-muted">Revision v3 · 2026-10-15</p>
+  <!-- Patient -->
+  <h5>Patient Info</h5>
+  <div class="row g-2 mb-4">
+    <div class="col-4 col-md-2"><label class="form-label small">Sex</label><select id="sex" class="form-select form-select-sm"><option value="M">Male</option><option value="F">Female</option></select></div>
+    <div class="col-4 col-md-2"><label class="form-label small">Height (cm)</label><input id="height_cm" class="form-control form-control-sm" type="number"></div>
+    <div class="col-4 col-md-2"><label class="form-label small">Weight (kg)</label><input id="weight_kg" class="form-control form-control-sm" type="number"></div>
+    <div class="col-4 col-md-2 align-self-end"><strong>BSA:</strong> <span id="bsa">-</span> m²</div>
+  </div>
+
+  <!-- Sections -->
+  <h5>M‑mode / 2D Measurements</h5><div id="m-mode" class="row gy-2 mb-3"></div>
+  <h5>Doppler &amp; Valve Measurements</h5>
+  <div id="doppler" class="row gy-2"></div>
+  <details open class="border rounded p-3">
+    <summary>Diastolic function / LAP — ASE 2025 pathway + custom LA surrogate</summary>
+    <p class="small text-muted mt-2">請確認心律及一般流程適用性。APCs / VPCs 表示 sinus rhythm with ectopy，請選可靠且具代表性的心搏；AF 不套用一般流程。</p>
+    <div id="df-context" class="row gy-2"></div>
+    <div id="df-measures" class="row gy-2"></div>
+    <p class="mt-2"><strong>Estimated PASP:</strong> <output id="estimated-pasp">Unavailable</output></p>
+    <p class="small text-muted">Estimated PASP = TRPG + selected RAP。RAP 預設 8 為起始估計，請由操作者確認，並非 IVC 實測自動判值。PASP 估計須無 RVOT／pulmonary valve／pulmonary artery obstruction；有可用 PASP 時優先於 TRV，兩者合計為一項條件。</p>
+    <div id="df-options" class="row gy-2"></div>
+    <p class="small text-muted">S/D 勾選＝符合 ≤0.67；未勾選＝不符合，作為陰性條件參與判讀。LARS、IVRT 不納入此版本自動判讀。</p>
+    <div id="lavi-criterion" class="alert alert-light border py-2 small" role="status" aria-live="polite"></div>
+    <p class="small text-muted">實測 LAVi 優先。無實測值時，自訂替代規則：LA diam &lt;40 mm 且 LADi &lt;23.35 mm/m² → criterion ≤34；其餘有效組合 → criterion &gt;34。LADi 使用未四捨五入的 Mosteller BSA。資料不足保留 unknown。此為自訂 surrogate，並非實測 LAVi 或 ASE 驗證替代法；可手動修正，變更身高、體重、LA diam 或實測 LAVi 會清除舊 override。</p>
+    <p class="small mb-1">下列病況不適用一般流程，請改採疾病專屬判讀：</p>
+    <p class="small text-muted mb-0">Atrial fibrillation；severe primary MR；mitral stenosis（任何程度）；moderate/severe MAC；mitral repair / replacement / TEER；LVAD；heart transplant；non-cardiac PH；pericardial constriction。此清單為提示；除已有欄位可辨識的情況外，須由操作者確認適用性。</p>
+  </details>
+  <details open class="border rounded p-3">
+    <summary>PH probability — ESC/ERS 2022</summary>
+    <div id="ph-context" class="row gy-2 mt-2"></div>
+    <div id="ph-categories" class="row gy-2"></div>
+    <ul class="small">
+      <li>A：RV/LV basal diameter 或 area ratio &gt;1；septal flattening（LVEI &gt;1.1）；或 TAPSE/PASP &lt;0.55 mm/mmHg。</li>
+      <li>B：RVOT AT &lt;105 ms 或 mid-systolic notching；early-diastolic PR velocity &gt;2.2 m/s；或 PA diameter &gt;25 mm / 大於 aortic root。</li>
+      <li>C：IVC &gt;21 mm 且吸氣塌陷減少（sniff &lt;50% 或安靜吸氣 &lt;20%）；或 end-systolic RA area &gt;18 cm²。</li>
+    </ul>
+    <p class="small text-muted mb-0">需至少兩個不同類別陽性才能提升機率。同類的多項徵象僅算一類。TAPSE／S′ 偏低或一般 RV／RA dilatation 勾選不會自動算入。三類預設「已評估，無符合徵象」，請依實際評估確認；TRV 未提供仍為 indeterminate。Low probability 不列入 impression。</p>
+  </details>
+  <h5>Regurgitation Assessment</h5><div id="regurg" class="row gy-2 mb-3"></div>
+  <p class="small text-muted">選擇的 Grade 優先於 EROA 自動分級；請以整合判讀選擇嚴重度。四瓣膜皆無分級或陽性 EROA 時，依已完成判讀的工作流程輸出 No significant valvular regurgitation.</p>
+
+  <h5>Derived Values <small class="text-muted"></small></h5><div id="derived" class="row gy-2 mb-3"></div>
+  <h5>Impression / Interpretation Summary</h5><pre id="summary" class="border rounded p-2 bg-light"></pre>
+  <button id="toggleNormal" class="btn btn-secondary btn-sm flex-fill">載入範例</button>
+  <button id="resetForm" class="btn btn-outline-secondary btn-sm flex-fill">清空／新病例</button>
+  <button id="generate" class="btn btn-primary btn-sm flex-fill">Generate Report</button>
+  <h5 class="mt-4">Copy‑ready Report Text</h5><textarea id="reportText" rows="28" class="form-control"></textarea>
+</div>
+
+<!-- ↓ 只留這一行載入完整外部腳本，其他內嵌 <script> 全部刪掉 -->
+<script src="echo-rules.js"></script>
+<script src="echo-report.js"></script>
+</body>
+</html>
